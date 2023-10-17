@@ -1,23 +1,73 @@
+use std::fmt;
+
 use h3o::CellIndex;
 
-pub struct Settings {
-    pub cell_labels: bool,
-    pub edge_labels: bool,
+struct H3oViewer<I: Iterator<Item = CellIndex>> {
+    cells: I,
+    settings: Settings,
 }
 
-pub fn show_in_browser(
-    cells: impl IntoIterator<Item = CellIndex>,
-    settings: Settings,
-) {
-    let html = generate_html(cells, settings);
-    open_in_browser(&html);
+#[derive(Debug)]
+struct Settings {
+    cell_labels: bool,
+    edge_labels: bool,
 }
 
-fn generate_html(
-    cells: impl IntoIterator<Item = CellIndex>,
-    settings: Settings,
-) -> String {
-    todo!()
+impl<I: Iterator<Item = CellIndex>> fmt::Debug for H3oViewer<I> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("H3oViewer")
+            .field("cells", &"Iterator over CellIndexes")
+            .field("settings", &self.settings)
+            .finish()
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            cell_labels: true,
+            edge_labels: false,
+        }
+    }
+}
+impl<I: Iterator<Item = CellIndex>> H3oViewer<I> {
+    pub fn for_cells<
+        T: IntoIterator<Item = CellIndex, IntoIter = I> + Clone,
+    >(
+        cells: T,
+    ) -> Self {
+        H3oViewer {
+            cells: cells.into_iter(),
+            settings: Settings::default(),
+        }
+    }
+
+    pub fn with_cell_labels(&mut self) -> &mut Self {
+        self.settings.cell_labels = true;
+        self
+    }
+    pub fn without_cell_labels(&mut self)  -> &mut Self {
+        self.settings.cell_labels = false;
+        self
+    }
+    pub fn with_edge_labels(&mut self)  -> &mut Self {
+        self.settings.edge_labels = true;
+        self
+    }
+    pub fn without_edge_labels(&mut self)  -> &mut Self {
+        self.settings.edge_labels = false;
+        self
+    }
+
+    pub fn show_in_browser(&self) {
+        let html = self.generate_html();
+        open_in_browser(&html);
+    }
+
+    pub fn generate_html(&self) -> String {
+        dbg!(self);
+        todo!()
+    }
 }
 
 fn open_in_browser(html: &str) {
@@ -31,12 +81,11 @@ mod tests {
     #[test]
     fn correct_html() {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
-        let settings = Settings {
-            cell_labels: false,
-            edge_labels: true,
-        };
 
-        let html = generate_html(cells, settings);
+        let html = H3oViewer::for_cells(cells)
+            .with_cell_labels()
+            .without_edge_labels()
+            .generate_html();
         assert_eq!(html, "");
     }
 }
