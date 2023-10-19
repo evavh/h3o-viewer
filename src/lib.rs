@@ -1,6 +1,10 @@
-use std::fmt;
+use std::{
+    env, fmt,
+    fs::{self, File},
+};
 
 use h3o::CellIndex;
+use askama::Template;
 
 struct H3oViewer<I: Iterator<Item = CellIndex>> {
     cells: I,
@@ -11,6 +15,12 @@ struct H3oViewer<I: Iterator<Item = CellIndex>> {
 struct Settings {
     cell_labels: bool,
     edge_labels: bool,
+}
+
+#[derive(Template)]
+#[template(path = "viewer.html")]
+struct HtmlTemplate {
+    geojson: String,
 }
 
 impl<I: Iterator<Item = CellIndex>> fmt::Debug for H3oViewer<I> {
@@ -46,15 +56,15 @@ impl<I: Iterator<Item = CellIndex>> H3oViewer<I> {
         self.settings.cell_labels = true;
         self
     }
-    pub fn without_cell_labels(&mut self)  -> &mut Self {
+    pub fn without_cell_labels(&mut self) -> &mut Self {
         self.settings.cell_labels = false;
         self
     }
-    pub fn with_edge_labels(&mut self)  -> &mut Self {
+    pub fn with_edge_labels(&mut self) -> &mut Self {
         self.settings.edge_labels = true;
         self
     }
-    pub fn without_edge_labels(&mut self)  -> &mut Self {
+    pub fn without_edge_labels(&mut self) -> &mut Self {
         self.settings.edge_labels = false;
         self
     }
@@ -65,13 +75,18 @@ impl<I: Iterator<Item = CellIndex>> H3oViewer<I> {
     }
 
     pub fn generate_html(&self) -> String {
-        dbg!(self);
-        todo!()
+        let geojson = todo!();
+        let template = HtmlTemplate { geojson };
+        template.render().unwrap()
     }
 }
 
 fn open_in_browser(html: &str) {
-    todo!()
+    let target_dir: &str = &env::var("CARGO_TARGET_DIR").unwrap();
+    let path = format!("{target_dir}h3o-viewer.html");
+    fs::write(&path, html).unwrap();
+
+    webbrowser::open(&path).unwrap();
 }
 
 #[cfg(test)]
@@ -87,5 +102,15 @@ mod tests {
             .without_edge_labels()
             .generate_html();
         assert_eq!(html, "");
+    }
+
+    #[test]
+    fn opens_in_browser() {
+        let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
+
+        H3oViewer::for_cells(cells)
+            .with_cell_labels()
+            .without_edge_labels()
+            .show_in_browser();
     }
 }
