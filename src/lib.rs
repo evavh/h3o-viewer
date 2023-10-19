@@ -1,13 +1,15 @@
 use std::{
+    collections::HashSet,
     env, fmt,
     fs::{self, File},
+    path::PathBuf,
 };
 
-use h3o::CellIndex;
 use askama::Template;
+use h3o::{geom::ToGeo, CellIndex};
 
-struct H3oViewer<I: Iterator<Item = CellIndex>> {
-    cells: I,
+struct H3oViewer {
+    cells: HashSet<CellIndex>,
     settings: Settings,
 }
 
@@ -19,11 +21,11 @@ struct Settings {
 
 #[derive(Template)]
 #[template(path = "viewer.html")]
-struct HtmlTemplate {
-    geojson: String,
+struct HtmlTemplate<'a> {
+    geojson: &'a str,
 }
 
-impl<I: Iterator<Item = CellIndex>> fmt::Debug for H3oViewer<I> {
+impl fmt::Debug for H3oViewer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("H3oViewer")
             .field("cells", &"Iterator over CellIndexes")
@@ -40,53 +42,52 @@ impl Default for Settings {
         }
     }
 }
-impl<I: Iterator<Item = CellIndex>> H3oViewer<I> {
-    pub fn for_cells<
-        T: IntoIterator<Item = CellIndex, IntoIter = I> + Clone,
-    >(
-        cells: T,
-    ) -> Self {
+impl H3oViewer {
+    pub fn for_cells(cells: impl IntoIterator<Item = CellIndex>) -> Self {
         H3oViewer {
-            cells: cells.into_iter(),
+            cells: cells.into_iter().collect(),
             settings: Settings::default(),
         }
     }
 
-    pub fn with_cell_labels(&mut self) -> &mut Self {
+    pub fn with_cell_labels(mut self) -> Self {
         self.settings.cell_labels = true;
         self
     }
-    pub fn without_cell_labels(&mut self) -> &mut Self {
+    pub fn without_cell_labels(mut self) -> Self {
         self.settings.cell_labels = false;
         self
     }
-    pub fn with_edge_labels(&mut self) -> &mut Self {
+    pub fn with_edge_labels(mut self) -> Self {
         self.settings.edge_labels = true;
         self
     }
-    pub fn without_edge_labels(&mut self) -> &mut Self {
+    pub fn without_edge_labels(mut self) -> Self {
         self.settings.edge_labels = false;
         self
     }
 
-    pub fn show_in_browser(&self) {
+    pub fn show_in_browser(self) {
         let html = self.generate_html();
         open_in_browser(&html);
     }
 
-    pub fn generate_html(&self) -> String {
-        let geojson = todo!();
-        let template = HtmlTemplate { geojson };
+    pub fn generate_html(self) -> String {
+        let geojson = self.cells.to_geojson().unwrap();
+        let template = HtmlTemplate {
+            geojson: &geojson.to_string(),
+        };
         template.render().unwrap()
     }
 }
 
 fn open_in_browser(html: &str) {
-    let target_dir: &str = &env::var("CARGO_TARGET_DIR").unwrap();
-    let path = format!("{target_dir}h3o-viewer.html");
+    let cargo_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let path: PathBuf =
+        [&cargo_dir, "target", "h3o-viewer.html"].iter().collect();
     fs::write(&path, html).unwrap();
 
-    webbrowser::open(&path).unwrap();
+    webbrowser::open(&path.into_os_string().into_string().unwrap()).unwrap();
 }
 
 #[cfg(test)]
