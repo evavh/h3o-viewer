@@ -50,20 +50,13 @@ impl H3oViewer {
         }
     }
 
-    pub fn with_cell_labels(mut self) -> Self {
-        self.settings.cell_labels = true;
+    pub fn with_cell_labels(mut self, set_on: bool) -> Self {
+        self.settings.cell_labels = set_on;
         self
     }
-    pub fn without_cell_labels(mut self) -> Self {
-        self.settings.cell_labels = false;
-        self
-    }
-    pub fn with_edge_labels(mut self) -> Self {
-        self.settings.edge_labels = true;
-        self
-    }
-    pub fn without_edge_labels(mut self) -> Self {
-        self.settings.edge_labels = false;
+
+    pub fn with_edge_labels(mut self, set_on: bool) -> Self {
+        self.settings.edge_labels = set_on;
         self
     }
 
@@ -99,8 +92,8 @@ mod tests {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
 
         let html = H3oViewer::for_cells(cells)
-            .with_cell_labels()
-            .without_edge_labels()
+            .with_cell_labels(true)
+            .with_edge_labels(false)
             .generate_html();
         assert_eq!(html, "");
     }
@@ -110,8 +103,8 @@ mod tests {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
 
         H3oViewer::for_cells(cells)
-            .with_cell_labels()
-            .without_edge_labels()
+            .with_cell_labels(true)
+            .with_edge_labels(false)
             .show_in_browser();
     }
 }
