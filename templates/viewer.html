@@ -26,7 +26,10 @@
      }).addTo(map);
 
      var data = {{ geojson|safe }};
-     L.geoJSON(data).addTo(map);
+     var geojson = L.geoJSON(data);
+     var bounds = geojson.getBounds();
+     geojson.addTo(map);
+     map.fitBounds(bounds);
 
 </script>
 </body>

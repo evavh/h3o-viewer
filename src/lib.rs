@@ -6,7 +6,7 @@ use std::{
 };
 
 use askama::Template;
-use h3o::{geom::ToGeo, CellIndex};
+use h3o::{geom::ToGeo, CellIndex, LatLng};
 
 struct H3oViewer {
     cells: HashSet<CellIndex>,
@@ -91,7 +91,7 @@ mod tests {
     fn correct_html() {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
 
-        let html = H3oViewer::for_cells(cells)
+        let html = H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
             .with_cell_labels(true)
             .with_edge_labels(false)
             .generate_html();
@@ -102,7 +102,7 @@ mod tests {
     fn opens_in_browser() {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
 
-        H3oViewer::for_cells(cells)
+        H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
             .with_cell_labels(true)
             .with_edge_labels(false)
             .show_in_browser();
