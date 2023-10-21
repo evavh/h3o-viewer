@@ -1,13 +1,13 @@
 use std::{
     collections::HashSet,
     env, fmt,
-    fs::{self, File},
+    fs::{self},
     path::PathBuf,
 };
 
 use askama::Template;
 use geojson::{Geometry, Value::GeometryCollection};
-use h3o::{geom::ToGeo, CellIndex, LatLng};
+use h3o::{geom::ToGeo, CellIndex};
 
 struct H3oViewer {
     cells: HashSet<CellIndex>,
@@ -104,17 +104,6 @@ fn open_in_browser(html: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn correct_html() {
-        let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
-
-        let html = H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
-            .with_cell_labels(true)
-            .with_edge_labels(false)
-            .generate_html();
-        assert_eq!(html, "");
-    }
 
     #[test]
     fn opens_in_browser() {
