@@ -6,6 +6,7 @@ use std::{
 };
 
 use askama::Template;
+use geojson::{Geometry, Value::GeometryCollection};
 use h3o::{geom::ToGeo, CellIndex, LatLng};
 
 struct H3oViewer {
@@ -17,6 +18,7 @@ struct H3oViewer {
 struct Settings {
     cell_labels: bool,
     edge_labels: bool,
+    separate_cells: bool,
 }
 
 #[derive(Template)]
@@ -39,6 +41,7 @@ impl Default for Settings {
         Self {
             cell_labels: true,
             edge_labels: false,
+            separate_cells: true,
         }
     }
 }
@@ -60,15 +63,30 @@ impl H3oViewer {
         self
     }
 
+    pub fn render_cells_separately(mut self, set_on: bool) -> Self {
+        self.settings.separate_cells = set_on;
+        self
+    }
+
     pub fn show_in_browser(self) {
         let html = self.generate_html();
         open_in_browser(&html);
     }
 
     pub fn generate_html(self) -> String {
-        let geojson = self.cells.to_geojson().unwrap();
+        let geometry: Geometry = if self.settings.separate_cells {
+            let geometry_collection: Vec<_> = self
+                .cells
+                .into_iter()
+                .map(CellIndex::to_geojson)
+                .map(Result::unwrap)
+                .collect();
+            GeometryCollection(geometry_collection).into()
+        } else {
+            self.cells.to_geojson().unwrap()
+        };
         let template = HtmlTemplate {
-            geojson: &geojson.to_string(),
+            geojson: &geometry.to_string(),
         };
         template.render().unwrap()
     }
