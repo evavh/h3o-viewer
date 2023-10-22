@@ -6,7 +6,10 @@ use std::{
 };
 
 use askama::Template;
-use geojson::{Geometry, Value::GeometryCollection};
+use geojson::{
+    Feature, FeatureCollection, Geometry, JsonObject, JsonValue,
+    Value::GeometryCollection,
+};
 use h3o::{geom::ToGeo, CellIndex};
 
 struct H3oViewer {
@@ -53,6 +56,7 @@ impl H3oViewer {
         }
     }
 
+    /// Default: on, only works when render_cells_seperately is set (default on)
     pub fn with_cell_labels(mut self, set_on: bool) -> Self {
         self.settings.cell_labels = set_on;
         self
@@ -74,22 +78,44 @@ impl H3oViewer {
     }
 
     pub fn generate_html(self) -> String {
-        let geometry: Geometry = if self.settings.separate_cells {
-            let geometry_collection: Vec<_> = self
-                .cells
-                .into_iter()
-                .map(CellIndex::to_geojson)
-                .map(Result::unwrap)
-                .collect();
-            GeometryCollection(geometry_collection).into()
-        } else {
-            self.cells.to_geojson().unwrap()
-        };
+        let geometry = self.cells_to_features();
         let template = HtmlTemplate {
             geojson: &geometry.to_string(),
         };
         template.render().unwrap()
     }
+
+    fn cells_to_features(&self) -> FeatureCollection {
+        if self.settings.separate_cells {
+            let mut feature_list: Vec<Feature> = Vec::new();
+
+            for cell in &self.cells {
+                let geometry = cell.to_geojson().unwrap();
+                let properties = get_properties(cell);
+                let feature = Feature {
+                    geometry: Some(geometry),
+                    properties: Some(properties),
+                    ..Default::default()
+                };
+                feature_list.push(feature);
+            }
+            feature_list.into_iter().collect()
+        } else {
+            let geometry = self.cells.clone().to_geojson().unwrap();
+            [Feature {
+                geometry: Some(geometry),
+                ..Default::default()
+            }]
+            .into_iter()
+            .collect()
+        }
+    }
+}
+
+fn get_properties(cell: &CellIndex) -> JsonObject {
+    let mut properties = JsonObject::new();
+    properties.insert("index".to_string(), JsonValue::from(cell.to_string()));
+    properties
 }
 
 fn open_in_browser(html: &str) {
