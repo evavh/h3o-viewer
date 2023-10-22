@@ -26,11 +26,7 @@
      }).addTo(map);
 
      var data = {{ geojson|safe }};
-     var geojson = L.geoJSON(data, {
-	     onEachFeature: function (feature, layer) {
-		layer.bindTooltip(feature.properties.index, {permanent: true});
-	     }
-     });
+     {{ geometry_code|safe }}
      var bounds = geojson.getBounds();
      geojson.addTo(map);
      map.fitBounds(bounds);

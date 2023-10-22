@@ -1,18 +1,10 @@
-use std::{
-    collections::HashSet,
-    env, fmt,
-    fs::{self},
-    path::PathBuf,
-};
+use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
 
 use askama::Template;
-use geojson::{
-    Feature, FeatureCollection, Geometry, JsonObject, JsonValue,
-    Value::GeometryCollection,
-};
+use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
 use h3o::{geom::ToGeo, CellIndex};
 
-struct H3oViewer {
+pub struct H3oViewer {
     cells: HashSet<CellIndex>,
     settings: Settings,
 }
@@ -26,8 +18,9 @@ struct Settings {
 
 #[derive(Template)]
 #[template(path = "viewer.html")]
-struct HtmlTemplate<'a> {
-    geojson: &'a str,
+struct HtmlTemplate {
+    geojson: String,
+    geometry_code: String,
 }
 
 impl fmt::Debug for H3oViewer {
@@ -80,7 +73,8 @@ impl H3oViewer {
     pub fn generate_html(self) -> String {
         let geometry = self.cells_to_features();
         let template = HtmlTemplate {
-            geojson: &geometry.to_string(),
+            geojson: geometry.to_string(),
+            geometry_code: self.pick_geometry_code(),
         };
         template.render().unwrap()
     }
@@ -108,6 +102,18 @@ impl H3oViewer {
             }]
             .into_iter()
             .collect()
+        }
+    }
+    fn pick_geometry_code(&self) -> String {
+        if self.settings.cell_labels {
+            "var geojson = L.geoJSON(data, {
+	        onEachFeature: function (feature, layer) {
+            layer.bindTooltip(feature.properties.index, {permanent: true});
+        }
+    });"
+            .to_string()
+        } else {
+            "var geojson = L.geoJSON(data);".to_string()
         }
     }
 }
