@@ -11,8 +11,8 @@ pub struct H3oViewer {
 
 #[derive(Debug)]
 struct Settings {
-    cell_labels: bool,
-    edge_labels: bool,
+    cell_indexes: bool,
+    edge_lengths: bool,
     separate_cells: bool,
 }
 
@@ -35,8 +35,8 @@ impl fmt::Debug for H3oViewer {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            cell_labels: true,
-            edge_labels: false,
+            cell_indexes: false,
+            edge_lengths: false,
             separate_cells: true,
         }
     }
@@ -49,17 +49,21 @@ impl H3oViewer {
         }
     }
 
-    /// Default: on, only works when render_cells_seperately is set (default on)
-    pub fn with_cell_labels(mut self, set_on: bool) -> Self {
-        self.settings.cell_labels = set_on;
+    /// Default: off, only works when render_cells_seperately is set (default on)
+    pub fn with_cell_indexes(mut self, set_on: bool) -> Self {
+        self.settings.cell_indexes = set_on;
         self
     }
 
-    pub fn with_edge_labels(mut self, set_on: bool) -> Self {
-        self.settings.edge_labels = set_on;
+    /// Default: off, only works when render_cells_seperately is set (default
+    /// on)
+    pub fn with_edge_lengths(mut self, set_on: bool) -> Self {
+        self.settings.edge_lengths = set_on;
         self
     }
 
+    /// Default: on, recommended to turn off if rendering is very slow for
+    /// a large number of cells
     pub fn render_cells_separately(mut self, set_on: bool) -> Self {
         self.settings.separate_cells = set_on;
         self
@@ -107,7 +111,7 @@ impl H3oViewer {
     }
 
     fn pick_geometry_code(&self) -> String {
-        if self.settings.cell_labels {
+        if self.settings.cell_indexes {
             "var geojson = L.geoJSON(data, {
 	        onEachFeature: function (feature, layer) {
             layer.bindTooltip(feature.properties.label, {permanent: true});
@@ -177,8 +181,8 @@ mod tests {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
 
         H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
-            .with_cell_labels(true)
-            .with_edge_labels(false)
+            .with_cell_indexes(true)
+            .with_edge_lengths(true)
             .show_in_browser();
     }
 }
