@@ -2,7 +2,7 @@ use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
 
 use askama::Template;
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
-use h3o::{geom::ToGeo, CellIndex};
+use h3o::{geom::ToGeo, CellIndex, DirectedEdgeIndex};
 
 pub struct H3oViewer {
     cells: HashSet<CellIndex>,
@@ -81,17 +81,18 @@ impl H3oViewer {
 
     fn cells_to_features(&self) -> FeatureCollection {
         if self.settings.separate_cells {
-            let mut feature_list: Vec<Feature> = Vec::new();
+            let mut feature_list = Vec::new();
 
             for cell in &self.cells {
-                let geometry = cell.to_geojson().unwrap();
-                let properties = get_properties(cell);
-                let feature = Feature {
-                    geometry: Some(geometry),
-                    properties: Some(properties),
-                    ..Default::default()
-                };
-                feature_list.push(feature);
+                let cell_feature = cell_to_feature(cell);
+                feature_list.push(cell_feature);
+
+                if self.settings.edge_lengths {
+                    for edge in cell.edges() {
+                        let edge_feature = edge_to_feature(edge);
+                        feature_list.push(edge_feature);
+                    }
+                }
             }
             feature_list.into_iter().collect()
         } else {
@@ -104,11 +105,12 @@ impl H3oViewer {
             .collect()
         }
     }
+
     fn pick_geometry_code(&self) -> String {
         if self.settings.cell_labels {
             "var geojson = L.geoJSON(data, {
 	        onEachFeature: function (feature, layer) {
-            layer.bindTooltip(feature.properties.index, {permanent: true});
+            layer.bindTooltip(feature.properties.label, {permanent: true});
         }
     });"
             .to_string()
@@ -118,9 +120,42 @@ impl H3oViewer {
     }
 }
 
-fn get_properties(cell: &CellIndex) -> JsonObject {
+fn cell_to_feature(cell: &CellIndex) -> Feature {
+    let geometry = cell.to_geojson().unwrap();
+    let properties = get_cell_properties(cell);
+    let cell_feature = Feature {
+        geometry: Some(geometry),
+        properties: Some(properties),
+        ..Default::default()
+    };
+    cell_feature
+}
+
+fn edge_to_feature(edge: DirectedEdgeIndex) -> Feature {
+    let geometry = edge.to_geojson().unwrap();
+    let properties = get_edge_properties(&edge);
+    let edge_feature = Feature {
+        geometry: Some(geometry),
+        properties: Some(properties),
+        ..Default::default()
+    };
+    edge_feature
+}
+
+fn get_cell_properties(cell: &CellIndex) -> JsonObject {
     let mut properties = JsonObject::new();
-    properties.insert("index".to_string(), JsonValue::from(cell.to_string()));
+    properties.insert("label".to_string(), JsonValue::from(cell.to_string()));
+    properties
+}
+
+fn get_edge_properties(edge: &DirectedEdgeIndex) -> JsonObject {
+    let mut properties = JsonObject::new();
+    let length = if edge.length_m() > 1000.0 {
+        format!("{:.0} km", edge.length_km())
+    } else {
+        format!("{:.0} m", edge.length_m())
+    };
+    properties.insert("label".to_string(), JsonValue::from(length));
     properties
 }
 
