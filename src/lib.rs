@@ -94,6 +94,7 @@ impl H3oViewer {
     fn cells_to_features(&self) -> FeatureCollection {
         if self.settings.separate_cells {
             let mut feature_list = Vec::new();
+            let mut edges_seen = Vec::new();
 
             for cell in &self.cells {
                 let cell_feature = self.cell_to_feature(cell);
@@ -101,8 +102,11 @@ impl H3oViewer {
 
                 if self.settings.edge_lengths {
                     for edge in cell.edges() {
-                        let edge_feature = Self::edge_to_feature(edge);
-                        feature_list.push(edge_feature);
+                        if !edges_seen.contains(&inverse(&edge)) {
+                            let edge_feature = Self::edge_to_feature(edge);
+                            feature_list.push(edge_feature);
+                            edges_seen.push(edge.cells());
+                        }
                     }
                 }
             }
@@ -185,6 +189,10 @@ impl H3oViewer {
     }
 }
 
+fn inverse(edge: &DirectedEdgeIndex) -> (CellIndex, CellIndex) {
+    (edge.destination(), edge.origin())
+}
+
 fn open_in_browser(html: &str) {
     let cargo_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let path: PathBuf =
@@ -205,7 +213,7 @@ mod tests {
         H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
             .with_cell_indexes(true)
             .with_cell_resolutions(false)
-            .with_edge_lengths(false)
+            .with_edge_lengths(true)
             .show_in_browser();
     }
 }
