@@ -14,6 +14,7 @@ struct Settings {
     cell_indexes: bool,
     edge_lengths: bool,
     separate_cells: bool,
+    cell_resolutions: bool,
 }
 
 #[derive(Template)]
@@ -35,6 +36,7 @@ impl fmt::Debug for H3oViewer {
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            cell_resolutions: true,
             cell_indexes: false,
             edge_lengths: false,
             separate_cells: true,
@@ -59,6 +61,12 @@ impl H3oViewer {
     /// on)
     pub fn with_edge_lengths(mut self, set_on: bool) -> Self {
         self.settings.edge_lengths = set_on;
+        self
+    }
+
+    /// Default: on, only works when render_cells_seperately is set (default on)
+    pub fn with_cell_resolutions(mut self, set_on: bool) -> Self {
+        self.settings.cell_resolutions = set_on;
         self
     }
 
@@ -88,12 +96,12 @@ impl H3oViewer {
             let mut feature_list = Vec::new();
 
             for cell in &self.cells {
-                let cell_feature = cell_to_feature(cell);
+                let cell_feature = self.cell_to_feature(cell);
                 feature_list.push(cell_feature);
 
                 if self.settings.edge_lengths {
                     for edge in cell.edges() {
-                        let edge_feature = edge_to_feature(edge);
+                        let edge_feature = Self::edge_to_feature(edge);
                         feature_list.push(edge_feature);
                     }
                 }
@@ -110,8 +118,61 @@ impl H3oViewer {
         }
     }
 
-    fn pick_geometry_code(&self) -> String {
+    fn cell_to_feature(&self, cell: &CellIndex) -> Feature {
+        let geometry = cell.to_geojson().unwrap();
+        let properties = self.get_cell_properties(cell);
+        let cell_feature = Feature {
+            geometry: Some(geometry),
+            properties: Some(properties),
+            ..Default::default()
+        };
+        cell_feature
+    }
+
+    fn edge_to_feature(edge: DirectedEdgeIndex) -> Feature {
+        let geometry = edge.to_geojson().unwrap();
+        let properties = Self::get_edge_properties(&edge);
+        let edge_feature = Feature {
+            geometry: Some(geometry),
+            properties: Some(properties),
+            ..Default::default()
+        };
+        edge_feature
+    }
+
+    fn get_cell_properties(&self, cell: &CellIndex) -> JsonObject {
+        let mut properties = JsonObject::new();
+        let mut val = String::new();
+
+        if self.settings.cell_resolutions {
+            val += &format!("Res: {}", cell.resolution().to_string());
+        }
+
+        if self.settings.cell_resolutions && self.settings.cell_indexes {
+            val += "<br>";
+        }
+
         if self.settings.cell_indexes {
+            val += &cell.to_string();
+        }
+
+        properties.insert("label".to_string(), JsonValue::from(val));
+        properties
+    }
+
+    fn get_edge_properties(edge: &DirectedEdgeIndex) -> JsonObject {
+        let mut properties = JsonObject::new();
+        let length = if edge.length_m() > 1000.0 {
+            format!("{:.0} km", edge.length_km())
+        } else {
+            format!("{:.0} m", edge.length_m())
+        };
+        properties.insert("label".to_string(), JsonValue::from(length));
+        properties
+    }
+
+    fn pick_geometry_code(&self) -> String {
+        if self.settings.cell_indexes || self.settings.cell_resolutions {
             "var geojson = L.geoJSON(data, {
 	        onEachFeature: function (feature, layer) {
             layer.bindTooltip(feature.properties.label, {permanent: true});
@@ -122,45 +183,6 @@ impl H3oViewer {
             "var geojson = L.geoJSON(data);".to_string()
         }
     }
-}
-
-fn cell_to_feature(cell: &CellIndex) -> Feature {
-    let geometry = cell.to_geojson().unwrap();
-    let properties = get_cell_properties(cell);
-    let cell_feature = Feature {
-        geometry: Some(geometry),
-        properties: Some(properties),
-        ..Default::default()
-    };
-    cell_feature
-}
-
-fn edge_to_feature(edge: DirectedEdgeIndex) -> Feature {
-    let geometry = edge.to_geojson().unwrap();
-    let properties = get_edge_properties(&edge);
-    let edge_feature = Feature {
-        geometry: Some(geometry),
-        properties: Some(properties),
-        ..Default::default()
-    };
-    edge_feature
-}
-
-fn get_cell_properties(cell: &CellIndex) -> JsonObject {
-    let mut properties = JsonObject::new();
-    properties.insert("label".to_string(), JsonValue::from(cell.to_string()));
-    properties
-}
-
-fn get_edge_properties(edge: &DirectedEdgeIndex) -> JsonObject {
-    let mut properties = JsonObject::new();
-    let length = if edge.length_m() > 1000.0 {
-        format!("{:.0} km", edge.length_km())
-    } else {
-        format!("{:.0} m", edge.length_m())
-    };
-    properties.insert("label".to_string(), JsonValue::from(length));
-    properties
 }
 
 fn open_in_browser(html: &str) {
@@ -182,7 +204,8 @@ mod tests {
 
         H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
             .with_cell_indexes(true)
-            .with_edge_lengths(true)
+            .with_cell_resolutions(false)
+            .with_edge_lengths(false)
             .show_in_browser();
     }
 }
