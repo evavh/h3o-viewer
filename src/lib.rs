@@ -2,11 +2,12 @@ use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
 
 use askama::Template;
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
-use h3o::{geom::ToGeo, CellIndex, DirectedEdgeIndex};
+use h3o::{geom::ToGeo, CellIndex, DirectedEdgeIndex, LatLng};
 
 pub struct H3oViewer {
     cells: HashSet<CellIndex>,
     settings: Settings,
+    circles: Vec<(LatLng, usize)>,
 }
 
 #[derive(Debug)]
@@ -22,6 +23,7 @@ struct Settings {
 struct HtmlTemplate {
     geojson: String,
     geometry_code: String,
+    circles: String,
 }
 
 impl fmt::Debug for H3oViewer {
@@ -48,6 +50,7 @@ impl H3oViewer {
         H3oViewer {
             cells: cells.into_iter().collect(),
             settings: Settings::default(),
+            circles: Vec::new(),
         }
     }
 
@@ -77,6 +80,11 @@ impl H3oViewer {
         self
     }
 
+    pub fn draw_circle(mut self, center: LatLng, radius: usize) -> Self {
+        self.circles.push((center, radius));
+        self
+    }
+
     pub fn show_in_browser(self) {
         let html = self.generate_html();
         open_in_browser(&html);
@@ -87,6 +95,7 @@ impl H3oViewer {
         let template = HtmlTemplate {
             geojson: geometry.to_string(),
             geometry_code: self.pick_geometry_code(),
+            circles: self.generate_circles(),
         };
         template.render().unwrap()
     }
@@ -187,6 +196,19 @@ impl H3oViewer {
             "var geojson = L.geoJSON(data);".to_string()
         }
     }
+
+    fn generate_circles(&self) -> String {
+        self.circles
+            .iter()
+            .map(|(c, r)| {
+                format!(
+                    "L.circle([{}, {}], {{radius: {r}, fill: false, color: '#ee0000'}}).addTo(map);\n",
+                    c.lat(),
+                    c.lng()
+                )
+            })
+            .collect()
+    }
 }
 
 fn inverse(edge: &DirectedEdgeIndex) -> (CellIndex, CellIndex) {
@@ -214,6 +236,8 @@ mod tests {
             .with_cell_indexes(true)
             .with_cell_resolutions(false)
             .with_edge_lengths(true)
+            .draw_circle(cells[0].into(), 150)
+            .draw_circle(cells[0].into(), 200)
             .show_in_browser();
     }
 }
