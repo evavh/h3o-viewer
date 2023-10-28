@@ -22,7 +22,6 @@ struct Settings {
 #[template(path = "viewer.html")]
 struct HtmlTemplate {
     geojson: String,
-    geometry_code: String,
     circles: String,
 }
 
@@ -94,7 +93,6 @@ impl H3oViewer {
         let geometry = self.cells_to_features();
         let template = HtmlTemplate {
             geojson: geometry.to_string(),
-            geometry_code: self.pick_geometry_code(),
             circles: self.generate_circles(),
         };
         template.render().unwrap()
@@ -184,19 +182,6 @@ impl H3oViewer {
         properties
     }
 
-    fn pick_geometry_code(&self) -> String {
-        if self.settings.cell_indexes || self.settings.cell_resolutions {
-            "var geojson = L.geoJSON(data, {
-	        onEachFeature: function (feature, layer) {
-            layer.bindTooltip(feature.properties.label, {permanent: true});
-        }
-    });"
-            .to_string()
-        } else {
-            "var geojson = L.geoJSON(data);".to_string()
-        }
-    }
-
     fn generate_circles(&self) -> String {
         self.circles
             .iter()
@@ -217,9 +202,16 @@ fn inverse(edge: &DirectedEdgeIndex) -> (CellIndex, CellIndex) {
 
 fn open_in_browser(html: &str) {
     let cargo_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
-    let path: PathBuf =
+    let default_path: PathBuf =
         [&cargo_dir, "target", "h3o-viewer.html"].iter().collect();
-    fs::write(&path, html).unwrap();
+    let second_path: PathBuf = [&cargo_dir, "h3o-viewer.html"].iter().collect();
+    let path = match fs::write(&default_path, html) {
+        Ok(()) => default_path,
+        Err(_) => {
+            fs::write(&second_path, html).unwrap();
+            second_path
+        }
+    };
 
     webbrowser::open(&path.into_os_string().into_string().unwrap()).unwrap();
 }
@@ -232,12 +224,11 @@ mod tests {
     fn opens_in_browser() {
         let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
 
-        H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
-            .with_cell_indexes(true)
+        dbg!(H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
             .with_cell_resolutions(false)
-            .with_edge_lengths(true)
-            .draw_circle(cells[0].into(), 150)
-            .draw_circle(cells[0].into(), 200)
-            .show_in_browser();
+            .with_edge_lengths(true))
+        .draw_circle(cells[0].into(), 150)
+        .draw_circle(cells[0].into(), 200)
+        .show_in_browser();
     }
 }

@@ -27,7 +27,13 @@
      {{ circles|safe }}
 
      var data = {{ geojson|safe }};
-     {{ geometry_code|safe }}
+     var geojson = L.geoJSON(data, {
+         onEachFeature: function (feature, layer) {
+            if (feature.properties.label != "") {
+                layer.bindTooltip(feature.properties.label, {permanent: true});
+            }
+        }
+     });
      var bounds = geojson.getBounds();
      geojson.addTo(map);
      map.fitBounds(bounds);
