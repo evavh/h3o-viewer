@@ -132,23 +132,23 @@ impl H3oViewer {
     fn cell_to_feature(&self, cell: &CellIndex) -> Feature {
         let geometry = cell.to_geojson().unwrap();
         let properties = self.get_cell_properties(cell);
-        let cell_feature = Feature {
+
+        Feature {
             geometry: Some(geometry),
             properties: Some(properties),
             ..Default::default()
-        };
-        cell_feature
+        }
     }
 
     fn edge_to_feature(edge: DirectedEdgeIndex) -> Feature {
         let geometry = edge.to_geojson().unwrap();
         let properties = Self::get_edge_properties(&edge);
-        let edge_feature = Feature {
+
+        Feature {
             geometry: Some(geometry),
             properties: Some(properties),
             ..Default::default()
-        };
-        edge_feature
+        }
     }
 
     fn get_cell_properties(&self, cell: &CellIndex) -> JsonObject {
@@ -156,7 +156,7 @@ impl H3oViewer {
         let mut val = String::new();
 
         if self.settings.cell_resolutions {
-            val += &format!("Res: {}", cell.resolution().to_string());
+            val += &format!("Res: {}", cell.resolution());
         }
 
         if self.settings.cell_resolutions && self.settings.cell_indexes {
@@ -183,6 +183,8 @@ impl H3oViewer {
     }
 
     fn generate_circles(&self) -> String {
+        // clippy version is very unclear, perf doesn't matter here
+        #[allow(clippy::format_collect)]
         self.circles
             .iter()
             .map(|(c, r)| {
