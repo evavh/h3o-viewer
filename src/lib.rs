@@ -11,6 +11,7 @@ pub struct H3oViewer {
 }
 
 #[derive(Debug)]
+#[allow(clippy::struct_excessive_bools)] // setter functions make this ok
 struct Settings {
     cell_indexes: bool,
     edge_lengths: bool,
@@ -30,6 +31,7 @@ impl fmt::Debug for H3oViewer {
         f.debug_struct("H3oViewer")
             .field("cells", &"Iterator over CellIndexes")
             .field("settings", &self.settings)
+            .field("circles", &self.circles)
             .finish()
     }
 }
@@ -53,20 +55,23 @@ impl H3oViewer {
         }
     }
 
-    /// Default: off, only works when render_cells_seperately is set (default on)
+    /// Default: off, only works when `render_cells_seperately` is set (default on)
+    #[must_use]
     pub fn with_cell_indexes(mut self, set_on: bool) -> Self {
         self.settings.cell_indexes = set_on;
         self
     }
 
-    /// Default: off, only works when render_cells_seperately is set (default
+    /// Default: off, only works when `render_cells_seperately` is set (default
     /// on)
+    #[must_use]
     pub fn with_edge_lengths(mut self, set_on: bool) -> Self {
         self.settings.edge_lengths = set_on;
         self
     }
 
-    /// Default: on, only works when render_cells_seperately is set (default on)
+    /// Default: on, only works when `render_cells_seperately` is set (default on)
+    #[must_use]
     pub fn with_cell_resolutions(mut self, set_on: bool) -> Self {
         self.settings.cell_resolutions = set_on;
         self
@@ -74,11 +79,13 @@ impl H3oViewer {
 
     /// Default: on, recommended to turn off if rendering is very slow for
     /// a large number of cells
+    #[must_use]
     pub fn render_cells_separately(mut self, set_on: bool) -> Self {
         self.settings.separate_cells = set_on;
         self
     }
 
+    #[must_use]
     pub fn draw_circle(mut self, center: LatLng, radius: usize) -> Self {
         self.circles.push((center, radius));
         self
@@ -89,6 +96,7 @@ impl H3oViewer {
         open_in_browser(&html);
     }
 
+    #[must_use]
     pub fn generate_html(self) -> String {
         let geometry = self.cells_to_features();
         let template = HtmlTemplate {
@@ -104,12 +112,12 @@ impl H3oViewer {
             let mut edges_seen = Vec::new();
 
             for cell in &self.cells {
-                let cell_feature = self.cell_to_feature(cell);
+                let cell_feature = self.cell_to_feature(*cell);
                 feature_list.push(cell_feature);
 
                 if self.settings.edge_lengths {
                     for edge in cell.edges() {
-                        if !edges_seen.contains(&inverse(&edge)) {
+                        if !edges_seen.contains(&inverse(edge)) {
                             let edge_feature = Self::edge_to_feature(edge);
                             feature_list.push(edge_feature);
                             edges_seen.push(edge.cells());
@@ -129,7 +137,7 @@ impl H3oViewer {
         }
     }
 
-    fn cell_to_feature(&self, cell: &CellIndex) -> Feature {
+    fn cell_to_feature(&self, cell: CellIndex) -> Feature {
         let geometry = cell.to_geojson().unwrap();
         let properties = self.get_cell_properties(cell);
 
@@ -142,7 +150,7 @@ impl H3oViewer {
 
     fn edge_to_feature(edge: DirectedEdgeIndex) -> Feature {
         let geometry = edge.to_geojson().unwrap();
-        let properties = Self::get_edge_properties(&edge);
+        let properties = Self::get_edge_properties(edge);
 
         Feature {
             geometry: Some(geometry),
@@ -151,7 +159,7 @@ impl H3oViewer {
         }
     }
 
-    fn get_cell_properties(&self, cell: &CellIndex) -> JsonObject {
+    fn get_cell_properties(&self, cell: CellIndex) -> JsonObject {
         let mut properties = JsonObject::new();
         let mut val = String::new();
 
@@ -171,7 +179,7 @@ impl H3oViewer {
         properties
     }
 
-    fn get_edge_properties(edge: &DirectedEdgeIndex) -> JsonObject {
+    fn get_edge_properties(edge: DirectedEdgeIndex) -> JsonObject {
         let mut properties = JsonObject::new();
         let length = if edge.length_m() > 1000.0 {
             format!("{:.0} km", edge.length_km())
@@ -198,7 +206,7 @@ impl H3oViewer {
     }
 }
 
-fn inverse(edge: &DirectedEdgeIndex) -> (CellIndex, CellIndex) {
+fn inverse(edge: DirectedEdgeIndex) -> (CellIndex, CellIndex) {
     (edge.destination(), edge.origin())
 }
 
@@ -207,6 +215,7 @@ fn open_in_browser(html: &str) {
     let default_path: PathBuf =
         [&cargo_dir, "target", "h3o-viewer.html"].iter().collect();
     let second_path: PathBuf = [&cargo_dir, "h3o-viewer.html"].iter().collect();
+    #[allow(clippy::single_match_else)]
     let path = match fs::write(&default_path, html) {
         Ok(()) => default_path,
         Err(_) => {
