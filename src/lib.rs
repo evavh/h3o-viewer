@@ -1,4 +1,6 @@
-use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
+use std::{
+    collections::HashSet, env, error::Error, fmt, fs, io::Error, path::PathBuf,
+};
 
 use askama::Template;
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
@@ -103,7 +105,9 @@ impl H3oViewer {
             geojson: geometry.to_string(),
             circles: self.generate_circles(),
         };
-        template.render().unwrap()
+        template
+            .render()
+            .expect("Writing strings into strings should not fail")
     }
 
     fn cells_to_features(&self) -> FeatureCollection {
@@ -127,7 +131,11 @@ impl H3oViewer {
             }
             feature_list.into_iter().collect()
         } else {
-            let geometry = self.cells.clone().to_geojson().unwrap();
+            let geometry = self
+                .cells
+                .clone()
+                .to_geojson()
+                .expect("Cannot fail because to_geom cannot fail");
             [Feature {
                 geometry: Some(geometry),
                 ..Default::default()
@@ -138,7 +146,9 @@ impl H3oViewer {
     }
 
     fn cell_to_feature(&self, cell: CellIndex) -> Feature {
-        let geometry = cell.to_geojson().unwrap();
+        let geometry = cell
+            .to_geojson()
+            .expect("Cannot fail because to_geom cannot fail");
         let properties = self.get_cell_properties(cell);
 
         Feature {
@@ -149,7 +159,9 @@ impl H3oViewer {
     }
 
     fn edge_to_feature(edge: DirectedEdgeIndex) -> Feature {
-        let geometry = edge.to_geojson().unwrap();
+        let geometry = edge
+            .to_geojson()
+            .expect("Cannot fail because to_geom cannot fail");
         let properties = Self::get_edge_properties(edge);
 
         Feature {
@@ -210,8 +222,8 @@ fn inverse(edge: DirectedEdgeIndex) -> (CellIndex, CellIndex) {
     (edge.destination(), edge.origin())
 }
 
-fn open_in_browser(html: &str) {
-    let cargo_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+fn open_in_browser(html: &str) -> Result<(), std::io::Error> {
+    let cargo_dir = env::var("CARGO_MANIFEST_DIR")?;
     let default_path: PathBuf =
         [&cargo_dir, "target", "h3o-viewer.html"].iter().collect();
     let second_path: PathBuf = [&cargo_dir, "h3o-viewer.html"].iter().collect();
@@ -219,12 +231,13 @@ fn open_in_browser(html: &str) {
     let path = match fs::write(&default_path, html) {
         Ok(()) => default_path,
         Err(_) => {
-            fs::write(&second_path, html).unwrap();
+            fs::write(&second_path, html)?;
             second_path
         }
     };
 
-    webbrowser::open(&path.into_os_string().into_string().unwrap()).unwrap();
+    webbrowser::open(&path.into_os_string().into_string()?)?;
+    Ok(())
 }
 
 #[cfg(test)]
