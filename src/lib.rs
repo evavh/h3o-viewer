@@ -1,6 +1,4 @@
-use std::{
-    collections::HashSet, env, error::Error, fmt, fs, io::Error, path::PathBuf,
-};
+use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
 
 use askama::Template;
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
@@ -19,6 +17,7 @@ struct Settings {
     edge_lengths: bool,
     separate_cells: bool,
     cell_resolutions: bool,
+    filename: Option<String>,
 }
 
 #[derive(Template)]
@@ -45,6 +44,7 @@ impl Default for Settings {
             cell_indexes: false,
             edge_lengths: false,
             separate_cells: true,
+            filename: None,
         }
     }
 }
@@ -87,6 +87,11 @@ impl H3oViewer {
         self
     }
 
+    pub fn custom_filename(mut self, filename: &str) -> Self {
+        self.settings.filename = Some(filename.to_owned());
+        self
+    }
+
     #[must_use]
     pub fn draw_circle(mut self, center: LatLng, radius: usize) -> Self {
         self.circles.push((center, radius));
@@ -94,8 +99,12 @@ impl H3oViewer {
     }
 
     pub fn show_in_browser(self) {
+        let filename = match self.settings.filename.clone() {
+            Some(override_filename) => override_filename,
+            None => String::from("h3o-viewer.html"),
+        };
         let html = self.generate_html();
-        open_in_browser(&html);
+        let _ = open_in_browser(&html, &filename);
     }
 
     #[must_use]
@@ -222,11 +231,11 @@ fn inverse(edge: DirectedEdgeIndex) -> (CellIndex, CellIndex) {
     (edge.destination(), edge.origin())
 }
 
-fn open_in_browser(html: &str) -> Result<(), std::io::Error> {
-    let cargo_dir = env::var("CARGO_MANIFEST_DIR")?;
+fn open_in_browser(html: &str, filename: &str) -> Result<(), std::io::Error> {
+    let cargo_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let default_path: PathBuf =
-        [&cargo_dir, "target", "h3o-viewer.html"].iter().collect();
-    let second_path: PathBuf = [&cargo_dir, "h3o-viewer.html"].iter().collect();
+        [&cargo_dir, "target", filename].iter().collect();
+    let second_path: PathBuf = [&cargo_dir, filename].iter().collect();
     #[allow(clippy::single_match_else)]
     let path = match fs::write(&default_path, html) {
         Ok(()) => default_path,
@@ -236,23 +245,27 @@ fn open_in_browser(html: &str) -> Result<(), std::io::Error> {
         }
     };
 
-    webbrowser::open(&path.into_os_string().into_string()?)?;
+    webbrowser::open(&path.into_os_string().into_string().unwrap())?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use h3o::Resolution;
+
     use super::*;
 
     #[test]
     fn opens_in_browser() {
-        let cells = [CellIndex::try_from(0x8a1fb46622dffff).unwrap()];
+        let center_cell = CellIndex::try_from(0x8a1fb46622dffff).unwrap();
+        let mut cells = center_cell.grid_disk::<Vec<_>>(1);
+        cells.push(cells[0].parent(Resolution::Nine).unwrap());
 
-        dbg!(H3oViewer::for_cells(cells[0].grid_disk::<Vec<_>>(1))
+        dbg!(H3oViewer::for_cells(cells)
             .with_cell_resolutions(false)
             .with_edge_lengths(true))
-        .draw_circle(cells[0].into(), 150)
-        .draw_circle(cells[0].into(), 200)
+        .draw_circle(center_cell.into(), 150)
+        .draw_circle(center_cell.into(), 200)
         .show_in_browser();
     }
 }
