@@ -1,6 +1,5 @@
 use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
 
-use askama::Template;
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
 use h3o::{geom::ToGeo, CellIndex, DirectedEdgeIndex, LatLng};
 
@@ -20,12 +19,7 @@ struct Settings {
     filename: Option<String>,
 }
 
-#[derive(Template)]
-#[template(path = "viewer.html")]
-struct HtmlTemplate {
-    geojson: String,
-    circles: String,
-}
+const HTML_TEMPLATE: &str = include_str!("../templates/viewer.html");
 
 impl fmt::Debug for H3oViewer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
@@ -40,7 +34,7 @@ impl fmt::Debug for H3oViewer {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            cell_resolutions: true,
+            cell_resolutions: false,
             cell_indexes: false,
             edge_lengths: false,
             separate_cells: true,
@@ -110,13 +104,12 @@ impl H3oViewer {
     #[must_use]
     pub fn generate_html(self) -> String {
         let geometry = self.cells_to_features();
-        let template = HtmlTemplate {
-            geojson: geometry.to_string(),
-            circles: self.generate_circles(),
-        };
-        template
-            .render()
-            .expect("Writing strings into strings should not fail")
+        let geojson = geometry.to_string();
+        let circles = self.generate_circles();
+
+        HTML_TEMPLATE
+            .replace("{{geojson}}", &geojson)
+            .replace("{{circles}}", &circles)
     }
 
     fn cells_to_features(&self) -> FeatureCollection {

@@ -24,9 +24,9 @@
           maxZoom: 19,
           attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
      }).addTo(map);
-     {{ circles|safe }}
+     {{circles}}
 
-     var data = {{ geojson|safe }};
+     var data = {{geojson}};
      var geojson = L.geoJSON(data, {
          onEachFeature: function (feature, layer) {
             if (feature.properties.label != "") {
@@ -34,8 +34,10 @@
             }
         }
      });
-     var bounds = geojson.getBounds();
+
      geojson.addTo(map);
+
+     var bounds = geojson.getBounds();
      map.fitBounds(bounds);
 
 
