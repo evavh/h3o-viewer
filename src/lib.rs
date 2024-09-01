@@ -1,10 +1,15 @@
-use std::{collections::HashSet, env, fmt, fs, hash::{DefaultHasher, Hash, Hasher}, path::PathBuf};
+use std::{
+    collections::HashSet,
+    env, fmt, fs,
+    hash::{DefaultHasher, Hash, Hasher},
+    path::PathBuf,
+};
 
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
 use h3o::{geom::ToGeo, CellIndex, DirectedEdgeIndex, LatLng};
 
 pub struct H3oViewer {
-    cells: HashSet<CellIndex>,
+    cell_groups: Vec<Vec<CellIndex>>,
     settings: Settings,
     circles: Vec<(LatLng, usize)>,
 }
@@ -33,7 +38,7 @@ impl fmt::Debug for H3oViewer {
 
 impl Hash for H3oViewer {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        format!("{:?}", self.cells).hash(state);
+        format!("{:?}", self.cell_groups).hash(state);
         format!("{:?}", self.settings).hash(state);
         format!("{:?}", self.circles).hash(state);
     }
@@ -53,7 +58,20 @@ impl Default for Settings {
 impl H3oViewer {
     pub fn for_cells(cells: impl IntoIterator<Item = CellIndex>) -> Self {
         H3oViewer {
-            cells: cells.into_iter().collect(),
+            cell_groups: Vec::from([cells.into_iter().collect()]),
+            settings: Settings::default(),
+            circles: Vec::new(),
+        }
+    }
+
+    pub fn for_cell_groups(
+        cells: impl IntoIterator<Item = impl IntoIterator<Item = CellIndex>>,
+    ) -> Self {
+        H3oViewer {
+            cell_groups: cells
+                .into_iter()
+                .map(|cells| cells.into_iter().collect())
+                .collect(),
             settings: Settings::default(),
             circles: Vec::new(),
         }
@@ -125,11 +143,11 @@ impl H3oViewer {
     }
 
     fn cells_to_features(&self) -> FeatureCollection {
-        if self.settings.separate_cells {
+        if self.settings.separate_cells && self.cell_groups.len() == 1 {
             let mut feature_list = Vec::new();
             let mut edges_seen = Vec::new();
 
-            for cell in &self.cells {
+            for cell in &self.cell_groups[0] {
                 let cell_feature = self.cell_to_feature(*cell);
                 feature_list.push(cell_feature);
 
@@ -145,17 +163,19 @@ impl H3oViewer {
             }
             feature_list.into_iter().collect()
         } else {
-            let geometry = self
-                .cells
-                .clone()
-                .to_geojson()
-                .expect("Cannot fail because to_geom cannot fail");
-            [Feature {
-                geometry: Some(geometry),
-                ..Default::default()
-            }]
-            .into_iter()
-            .collect()
+            self.cell_groups
+                .iter()
+                .map(|cell_group| {
+                    let geometry = cell_group
+                        .clone()
+                        .to_geojson()
+                        .expect("Cannot fail because to_geom cannot fail");
+                    Feature {
+                        geometry: Some(geometry),
+                        ..Default::default()
+                    }
+                })
+                .collect()
         }
     }
 
