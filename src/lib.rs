@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env, fmt, fs, path::PathBuf};
+use std::{collections::HashSet, env, fmt, fs, hash::{DefaultHasher, Hash, Hasher}, path::PathBuf};
 
 use geojson::{Feature, FeatureCollection, JsonObject, JsonValue};
 use h3o::{geom::ToGeo, CellIndex, DirectedEdgeIndex, LatLng};
@@ -28,6 +28,14 @@ impl fmt::Debug for H3oViewer {
             .field("settings", &self.settings)
             .field("circles", &self.circles)
             .finish()
+    }
+}
+
+impl Hash for H3oViewer {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        format!("{:?}", self.cells).hash(state);
+        format!("{:?}", self.settings).hash(state);
+        format!("{:?}", self.circles).hash(state);
     }
 }
 
@@ -93,9 +101,13 @@ impl H3oViewer {
     }
 
     pub fn show_in_browser(self) {
+        let mut state = DefaultHasher::new();
+        self.hash(&mut state);
+        let hash = state.finish();
+
         let filename = match self.settings.filename.clone() {
             Some(override_filename) => override_filename,
-            None => String::from("h3o-viewer.html"),
+            None => format!("h3o-viewer-{hash:X?}.html"),
         };
         let html = self.generate_html();
         let _ = open_in_browser(&html, &filename);
