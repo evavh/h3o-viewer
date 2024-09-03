@@ -166,10 +166,14 @@ impl H3oViewer {
             self.cell_groups
                 .iter()
                 .map(|cell_group| {
+                    let mut cell_group = cell_group.clone();
+                    cell_group.sort();
+                    cell_group.dedup();
+
                     let geometry = cell_group
                         .clone()
                         .to_geojson()
-                        .expect("Cannot fail because to_geom cannot fail");
+                        .expect("Resolution should be homogenous, and no duplicate cells");
                     Feature {
                         geometry: Some(geometry),
                         ..Default::default()
